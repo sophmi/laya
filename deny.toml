@@ -1,0 +1,38 @@
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-pc-windows-gnu",
+]
+all-features = true
+
+[licenses]
+version = 2
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MIT",
+    "Unlicense",
+    "Zlib",
+    "ISC",
+    "MPL-2.0"
+]
+
+exceptions = [{ name = "unicode-ident", allow = ["Unicode-DFS-2016"] }]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+
+skip-tree = [
+    { crate = "windows-sys@0.48.0", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
