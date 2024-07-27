@@ -9,7 +9,7 @@ pub struct ImageRequest {
     size: Size,
     rotation: Rotation,
     quality: Quality,
-    format: String,
+    format: Format,
 }
 
 pub type Dimension = u32;
@@ -48,4 +48,29 @@ pub enum Quality {
     Gray,
     Bitonal,
     Default,
+}
+
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+pub enum Format {
+    Jpg,
+    Tif,
+    Png,
+    Gif,
+    Jp2,
+    Pdf,
+    Webp,
+}
+
+impl Format {
+    pub fn mime(&self) -> &'static str {
+        match self {
+            Format::Jpg => "image/jpeg",
+            Format::Tif => "image/tiff",
+            Format::Png => "image/png",
+            Format::Gif => "image/gif",
+            Format::Jp2 => "image/jp2",
+            Format::Pdf => "application/pdf",
+            Format::Webp => "image/webp",
+        }
+    }
 }
