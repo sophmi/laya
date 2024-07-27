@@ -1,10 +1,10 @@
 mod info;
 mod image;
 
-use std::num::{NonZero};
+use std::num::NonZero;
 
 pub struct ImageRequest {
-    ident: String,
+    identifier: String,
     region: Region,
     size: Size,
     rotation: Rotation,
@@ -14,31 +14,36 @@ pub struct ImageRequest {
 
 pub type Dimension = u32;
 
-enum Region {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Region {
     Full,
     Square,
-    Absolute { x: Dimension, y: Dimension, width: NonZero<Dimension>, height: NonZero<Dimension> },
-    Percentage { x: Dimension, y: Dimension, width: NonZero<Dimension>, height: NonZero<Dimension> },
+    Absolute { x: Dimension, y: Dimension, width: Dimension, height: Dimension },
+    Percentage { x: f32, y: f32, width: f32, height: f32 },
 }
 
-struct Size {
-    maximize: bool,
-    scale: Option<Scale>,
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Size {
     upscale: bool,
-    mirror: bool,
+    scale: Scale,
 }
 
-enum Scale {
-    Percentage(u32),
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Scale {
+    Maximum,
+    Percentage(f32),
     Fixed { width: Option<NonZero<Dimension>>, height: Option<NonZero<Dimension>> },
+    AspectPreserving { width: NonZero<Dimension>, height: NonZero<Dimension> },
 }
 
-struct Rotation {
-    mirror: bool,
-    degrees: u16,
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rotation {
+    pub mirror: bool,
+    pub degrees: f32,
 }
 
-enum Quality {
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+pub enum Quality {
     Color,
     Gray,
     Bitonal,
