@@ -164,9 +164,10 @@ pub fn start() {
 
     startup
         .in_scope(|| {
+            let num_cpus = num_cpus::get_physical();
+
             info!("running server on {num_cpus} CPUs");
 
-            let num_cpus = num_cpus::get_physical();
             let executor = LocalExecutorPoolBuilder::new(PoolPlacement::MaxSpread(
                 num_cpus,
                 CpuSet::online().ok(),

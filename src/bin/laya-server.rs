@@ -2,6 +2,8 @@
 mod telemetry;
 
 fn main() {
-    telemetry::install_telemetry().expect("failed to install telemetry");
+    if let Err(e) = telemetry::install_telemetry() {
+        eprintln!("Failed to install telemetry {:?}", e);        
+    }
     laya::start();
 }
