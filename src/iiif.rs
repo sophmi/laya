@@ -1,5 +1,6 @@
 mod info;
 mod image;
+pub(crate) mod parse;
 
 use std::num::NonZero;
 
