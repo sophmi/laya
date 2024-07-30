@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::iiif::{Quality, Rotation};
+use crate::iiif::{Format, Quality, Rotation};
 
 impl FromStr for Rotation {
     type Err = ParseError;
@@ -38,6 +38,23 @@ impl FromStr for Quality {
     }
 }
 
+impl FromStr for Format {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "jpg" => Ok(Format::Jpg),
+            "tif" => Ok(Format::Tif),
+            "png" => Ok(Format::Png),
+            "gif" => Ok(Format::Gif),
+            "jp2" => Ok(Format::Jp2),
+            "pdf" => Ok(Format::Pdf),
+            "webp" => Ok(Format::Webp),
+            _ => Err(ParseError::UnrecognisedFormat(s.into()))
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     /// If the degrees to rotate by could not be parsed as a float.
@@ -48,6 +65,9 @@ pub enum ParseError {
 
     /// If the requested quality is unrecognised.
     UnrecognisedQuality(String),
+
+    /// If the requested format is unrecognised.
+    UnrecognisedFormat(String),
 }
 
 #[cfg(test)]
@@ -91,5 +111,11 @@ mod test {
     fn unrecognised_quality_err() {
         let result = "TRaFoaMP20230922".parse::<Quality>();
         assert_eq!(result, Err(ParseError::UnrecognisedQuality("TRaFoaMP20230922".into())));
+    }
+
+    #[test]
+    fn unrecognised_format_err() {
+        let result = "TRaFoaMP20230922".parse::<Format>();
+        assert_eq!(result, Err(ParseError::UnrecognisedFormat("TRaFoaMP20230922".into())));
     }
 }
