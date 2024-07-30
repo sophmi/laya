@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::iiif::Rotation;
+use crate::iiif::{Quality, Rotation};
 
 impl FromStr for Rotation {
     type Err = ParseError;
@@ -24,6 +24,20 @@ impl FromStr for Rotation {
     }
 }
 
+impl FromStr for Quality {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "color" => Ok(Quality::Color),
+            "gray" => Ok(Quality::Gray),
+            "bitonal" => Ok(Quality::Bitonal),
+            "default" => Ok(Quality::Default),
+            _ => Err(ParseError::UnrecognisedQuality(s.into())),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
     /// If the degrees to rotate by could not be parsed as a float.
@@ -31,6 +45,9 @@ pub enum ParseError {
 
     /// If the degrees to rotate by is out of bounds.
     RotationOutOfBounds(String),
+
+    /// If the requested quality is unrecognised.
+    UnrecognisedQuality(String),
 }
 
 #[cfg(test)]
@@ -62,5 +79,17 @@ mod test {
     fn rotation_not_float_err() {
         let result = "TRaFoaMP20230922".parse::<Rotation>();
         assert_eq!(result, Err(ParseError::RotationAngleUnparsable("TRaFoaMP20230922".into())));
+    }
+
+    #[test]
+    fn quality() {
+        let result = "color".parse::<Quality>();
+        assert_eq!(result, Ok(Quality::Color));
+    }
+
+    #[test]
+    fn unrecognised_quality_err() {
+        let result = "TRaFoaMP20230922".parse::<Quality>();
+        assert_eq!(result, Err(ParseError::UnrecognisedQuality("TRaFoaMP20230922".into())));
     }
 }
