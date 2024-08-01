@@ -3,9 +3,14 @@ newline_style = "Unix"
 
 reorder_imports = true
 group_imports = "StdExternalCrate"
-imports_granularity = "Crate"
+imports_granularity = "Module"
 
+hex_literal_case = "Upper"
 use_field_init_shorthand = true
+
+fn_call_width = 80
+struct_lit_width = 80
+struct_variant_width = 80
 
 comment_width = 100
 normalize_comments = true

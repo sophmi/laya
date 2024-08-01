@@ -1,4 +1,5 @@
 use std::str::FromStr;
+
 use crate::iiif::{Format, Quality, Rotation};
 
 impl FromStr for Rotation {
@@ -13,13 +14,12 @@ impl FromStr for Rotation {
         // Image API 3.0, s 4: the rotation parameter MUST be positive [as a float or integer]
         // Image API 3.0, s 4.3: The [rotation] ... may be any floating point number from 0 to 360
 
-        rotation.parse::<f32>()
+        rotation
+            .parse::<f32>()
             .map_err(|_| ParseError::RotationAngleUnparsable(rotation.into()))
-            .and_then(|degrees| {
-                match degrees {
-                    0f32..=360f32 => Ok(Rotation { mirror, degrees }),
-                    _ => Err(ParseError::RotationOutOfBounds(rotation.into()))
-                }
+            .and_then(|degrees| match degrees {
+                0f32..=360f32 => Ok(Rotation { mirror, degrees }),
+                _ => Err(ParseError::RotationOutOfBounds(rotation.into())),
             })
     }
 }
@@ -50,7 +50,7 @@ impl FromStr for Format {
             "jp2" => Ok(Format::Jp2),
             "pdf" => Ok(Format::Pdf),
             "webp" => Ok(Format::Webp),
-            _ => Err(ParseError::UnrecognisedFormat(s.into()))
+            _ => Err(ParseError::UnrecognisedFormat(s.into())),
         }
     }
 }

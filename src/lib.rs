@@ -6,27 +6,20 @@ mod iiif;
 
 // TODO: split this sample code into http.
 mod hyper_compat {
-    use futures_lite::{AsyncRead, AsyncWrite, Future};
-    use glommio::{
-        enclose,
-        net::{TcpListener, TcpStream},
-        sync::Semaphore,
-    };
-    use hyper::{
-        body::{Body as HttpBody, Bytes, Frame, Incoming},
-        service::service_fn,
-        Error, Request, Response,
-    };
+    use std::marker::PhantomData;
+    use std::net::SocketAddr;
+    use std::pin::Pin;
+    use std::rc::Rc;
+    use std::task::{Context, Poll};
+    use std::{io, slice};
 
-    use std::{
-        io,
-        marker::PhantomData,
-        net::SocketAddr,
-        pin::Pin,
-        rc::Rc,
-        slice,
-        task::{Context, Poll},
-    };
+    use futures_lite::{AsyncRead, AsyncWrite, Future};
+    use glommio::enclose;
+    use glommio::net::{TcpListener, TcpStream};
+    use glommio::sync::Semaphore;
+    use hyper::body::{Body as HttpBody, Bytes, Frame, Incoming};
+    use hyper::service::service_fn;
+    use hyper::{Error, Request, Response};
 
     #[derive(Clone)]
     struct HyperExecutor;
@@ -91,10 +84,7 @@ mod hyper_compat {
 
     impl From<&'static str> for ResponseBody {
         fn from(data: &'static str) -> Self {
-            ResponseBody {
-                _marker: PhantomData,
-                data: Some(Bytes::from(data)),
-            }
+            ResponseBody { _marker: PhantomData, data: Some(Bytes::from(data)) }
         }
     }
 
@@ -116,7 +106,7 @@ mod hyper_compat {
     ) -> io::Result<()>
     where
         S: Fn(Request<Incoming>) -> F + 'static + Copy,
-        F: Future<Output=Result<Response<ResponseBody>, R>> + 'static,
+        F: Future<Output = Result<Response<ResponseBody>, R>> + 'static,
         R: std::error::Error + 'static + Send + Sync,
         A: Into<SocketAddr>,
     {
@@ -142,11 +132,16 @@ mod hyper_compat {
     }
 }
 
-use glommio::{CpuSet, Latency, LocalExecutorBuilder, LocalExecutorPoolBuilder, Placement, PoolPlacement, Shares};
-use hyper::{body::Incoming, Method, Request, Response, StatusCode};
-use hyper_compat::ResponseBody;
 use std::convert::Infallible;
 use std::time::Duration;
+
+use glommio::{
+    CpuSet, Latency, LocalExecutorBuilder, LocalExecutorPoolBuilder, Placement, PoolPlacement,
+    Shares,
+};
+use hyper::body::Incoming;
+use hyper::{Method, Request, Response, StatusCode};
+use hyper_compat::ResponseBody;
 use tracing::{info, info_span};
 
 async fn hyper_demo(req: Request<Incoming>) -> Result<Response<ResponseBody>, Infallible> {
