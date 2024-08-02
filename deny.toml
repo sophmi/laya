@@ -12,12 +12,9 @@ version = 2
 allow = [
     "0BSD",
     "Apache-2.0",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
     "MIT",
     "Unlicense",
     "Zlib",
-    "ISC",
     "MPL-2.0"
 ]
 
@@ -26,10 +23,6 @@ exceptions = [{ name = "unicode-ident", allow = ["Unicode-DFS-2016"] }]
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
-
-skip-tree = [
-    { crate = "windows-sys@0.48.0", reason = "a foundational crate for many that bumps far too frequently to ever have a shared version" },
-]
 
 [sources]
 unknown-registry = "deny"

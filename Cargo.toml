@@ -2,9 +2,10 @@
 name = "laya"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0 OR MIT"
 
 [dependencies]
-futures-lite = "2.3.0"
+futures-lite = "1.13" # glommio requires 1.13.0
 glommio = "0.9.0"
 hyper = { version = "1.4.1", features = ["server", "http2", "http1"] }
 hyper-util = { version = "0.1.6", features = ["server-auto", "server", "http2", "http1"] }
