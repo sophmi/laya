@@ -31,3 +31,5 @@ cargo +nightly fmt --all
 ### Licensing
 
 Laya is dual-licensed under [Apache 2.0](LICENSE-APACHE) and [MIT](LICENSE-MIT).
+
+[openjp2-rs](https://github.com/Neopallium/openjp2/tree/master/openjp2-rs), a Rust port of OpenJPEG, is included as a subtree and is released under [2-Clause BSD](https://github.com/Neopallium/openjp2/blob/master/openjp2-rs/LICENSE).
