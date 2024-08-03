@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[cfg(not(target_os = "linux"))]
 compile_error!("Laya requires a Linux kernel >= 5.8");
 
@@ -133,12 +135,8 @@ mod hyper_compat {
 }
 
 use std::convert::Infallible;
-use std::time::Duration;
 
-use glommio::{
-    CpuSet, Latency, LocalExecutorBuilder, LocalExecutorPoolBuilder, Placement, PoolPlacement,
-    Shares,
-};
+use glommio::{CpuSet, LocalExecutorPoolBuilder, PoolPlacement};
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_compat::ResponseBody;
