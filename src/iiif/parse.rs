@@ -179,8 +179,8 @@ impl FromStr for Rotation {
         let mirror = s.starts_with('!');
         let rotation = if mirror { &s[1..] } else { s };
 
-        // Accept a rotation of 0 as examples (e.g. s 9) show it should be, despite the spec also
-        // containing the following contradiction:
+        // Accept a rotation of 0 as examples (e.g. s 9) show it should be supported despite the
+        // spec containing the following contradiction:
         // Image API 3.0, s 4: the rotation parameter MUST be positive [as a float or integer]
         // Image API 3.0, s 4.3: The [rotation] ... may be any floating point number from 0 to 360
 
@@ -188,7 +188,7 @@ impl FromStr for Rotation {
             .parse::<f32>()
             .map_err(|_| ParseError::RotationAngleUnparsable(rotation.into()))
             .and_then(|degrees| match degrees {
-                0f32..=360f32 => Ok(Rotation { mirror, degrees }),
+                0f32..=360.0 => Ok(Rotation { mirror, degrees }),
                 _ => Err(ParseError::RotationOutOfBounds(rotation.into())),
             })
     }
@@ -347,7 +347,7 @@ mod test {
     }
 
     #[test]
-    fn region_selector_oob_err() {
+    fn region_selector_out_of_bounds_err() {
         let result = "5,5,0,90".parse::<Region>();
         assert_eq!(
             result,
@@ -514,16 +514,16 @@ mod test {
     #[test]
     fn rotation() {
         let result = "180".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180f32 }));
+        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180.0 }));
 
         let result = "180.42".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180.42f32 }));
+        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180.42 }));
     }
 
     #[test]
     fn mirrored_rotation() {
         let result = "!180".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: true, degrees: 180f32 }));
+        assert_eq!(result, Ok(Rotation { mirror: true, degrees: 180.0 }));
     }
 
     #[test]
@@ -533,7 +533,7 @@ mod test {
     }
 
     #[test]
-    fn rotation_not_float_err() {
+    fn rotation_unparsable_err() {
         let result = "TRaFoaMP20230922".parse::<Rotation>();
         assert_eq!(result, Err(ParseError::RotationAngleUnparsable("TRaFoaMP20230922".into())));
     }
