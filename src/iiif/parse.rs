@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::num::NonZero;
 use std::str::FromStr;
 
@@ -152,11 +154,7 @@ fn parse_scale_px(input: &str) -> Result<NonZero<Dimension>, ParseError> {
         .parse::<u32>()
         .map_err(|_| ParseError::SizeDimensionUnparsable(input.into()))?;
 
-    if dimension >= 1 {
-        unsafe { Ok(NonZero::new_unchecked(dimension)) } // SAFETY: dimension >= 1
-    } else {
-        Err(ParseError::SizeDimensionOutOfBounds(input.into()))
-    }
+    NonZero::new(dimension).ok_or(ParseError::SizeDimensionOutOfBounds(input.into()))
 }
 
 impl FromStr for Rotation {
@@ -260,6 +258,62 @@ pub enum ParseError {
 impl ParseError {
     fn region_unparsable<S: Into<String>>(input: S, index: usize) -> ParseError {
         ParseError::RegionSelectorUnparsable { input: input.into(), index }
+    }
+}
+
+impl Error for ParseError {}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::RegionSelectorUnparsable { input, index } => write!(
+                f,
+                "Region {} '{input}' could not be parsed (expected integer for standard requests, \
+                 float for pct: requests).",
+                selector_name(*index)
+            ),
+            ParseError::RegionSelectorOutOfBounds { input, index } => write!(
+                f,
+                "Region {} '{input}' out of bounds: width and height must be greater than 0.",
+                selector_name(*index)
+            ),
+            ParseError::RegionPercentageOutOfBounds { input, index } => write!(
+                f,
+                "Region {} percentage '{input}' out of bounds: must be greater than 0.",
+                selector_name(*index)
+            ),
+            ParseError::RegionSelectorCount(s) => {
+                write!(f, "Region must include exactly 4 selectors x,y,w,h (received '{s}').")
+            }
+            ParseError::SizeMissingComma(s) => {
+                write!(f, "Size must include a comma to separate dimensions (received '{s}').")
+            }
+            ParseError::SizeMissingDimensions(s) => {
+                write!(f, "Size must include at least one dimension (received '{s}').")
+            }
+            ParseError::SizeDimensionUnparsable(s) => {
+                write!(f, "Size dimension '{s}' could not be parsed (expected integer).")
+            }
+            ParseError::SizePercentageUnparsable(s) => {
+                write!(f, "Size percentage '{s}' could not be parsed (expected integer or float).")
+            }
+            ParseError::SizeDimensionOutOfBounds(s) => {
+                write!(f, "Size dimension '{s}' out of bounds: must be at least 1.")
+            }
+            ParseError::SizePercentageOutOfBounds(s) => write!(
+                f,
+                "Size percentage '{s}' out of bounds: must be greater than 0 if upscaling \
+                 is requested, or (0.0, 100.0] otherwise."
+            ),
+            ParseError::RotationAngleUnparsable(s) => {
+                write!(f, "Rotation '{s}' could not be parsed (expected integer or float).")
+            }
+            ParseError::RotationOutOfBounds(s) => {
+                write!(f, "Rotation must be [0.0, 360.0], but was '{s}'.")
+            }
+            ParseError::UnrecognisedQuality(s) => write!(f, "Unrecognised quality '{s}'."),
+            ParseError::UnrecognisedFormat(s) => write!(f, "Unrecognised format '{s}'."),
+        }
     }
 }
 
