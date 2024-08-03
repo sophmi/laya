@@ -105,29 +105,7 @@ impl opj_image_comp {
 
 impl Clone for opj_image_comp {
     fn clone(&self) -> Self {
-        let mut comp = Self::default();
-        comp.dx = self.dx;
-        comp.dy = self.dy;
-        comp.w = self.w;
-        comp.h = self.h;
-        comp.x0 = self.x0;
-        comp.y0 = self.y0;
-        comp.prec = self.prec;
-        comp.bpp = self.bpp;
-        comp.sgnd = self.sgnd;
-        comp.resno_decoded = self.resno_decoded;
-        comp.factor = self.factor;
-        comp.alpha = self.alpha;
-        if !self.data.is_null() && comp.alloc_data() {
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    self.data as *const OPJ_INT32,
-                    comp.data,
-                    self.w as usize * self.h as usize,
-                );
-            }
-        }
-        comp
+        *self
     }
 }
 
@@ -144,6 +122,7 @@ pub struct opj_image_comptparm {
     pub bpp: OPJ_UINT32,
     pub sgnd: OPJ_UINT32,
 }
+
 pub type opj_image_cmptparm_t = opj_image_comptparm;
 
 #[repr(C)]
@@ -158,6 +137,7 @@ pub struct opj_image {
     pub icc_profile_buf: *mut OPJ_BYTE,
     pub icc_profile_len: OPJ_UINT32,
 }
+
 pub type opj_image_t = opj_image;
 
 impl Default for opj_image {
@@ -350,7 +330,7 @@ pub(crate) fn opj_image_create0() -> *mut opj_image_t {
 }
 
 #[no_mangle]
-pub fn opj_image_create(
+pub unsafe fn opj_image_create(
     mut numcmpts: OPJ_UINT32,
     mut cmptparms: *mut opj_image_cmptparm_t,
     mut clrspc: OPJ_COLOR_SPACE,
@@ -384,7 +364,7 @@ pub fn opj_image_create(
 }
 
 #[no_mangle]
-pub fn opj_image_destroy(mut image: *mut opj_image_t) {
+pub unsafe fn opj_image_destroy(mut image: *mut opj_image_t) {
     if !image.is_null() {
         // Convert back to a boxed value and drop it.
         let _ = unsafe { Box::from_raw(image) };
@@ -473,7 +453,7 @@ pub(crate) fn opj_copy_image_header(
 }
 
 #[no_mangle]
-pub fn opj_image_tile_create(
+pub unsafe fn opj_image_tile_create(
     mut numcmpts: OPJ_UINT32,
     mut cmptparms: *mut opj_image_cmptparm_t,
     mut clrspc: OPJ_COLOR_SPACE,

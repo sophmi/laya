@@ -267,24 +267,6 @@ pub(crate) enum J2KMarker {
     MCT,
     /// MCO marker value
     MCO,
-    /// EPC marker value (Part 11: JPEG 2000 for Wireless)
-    #[cfg(feature = "jpwl")]
-    EPC,
-    /// EPB marker value (Part 11: JPEG 2000 for Wireless)
-    #[cfg(feature = "jpwl")]
-    EPB,
-    /// ESD marker value (Part 11: JPEG 2000 for Wireless)
-    #[cfg(feature = "jpwl")]
-    ESD,
-    /// RED marker value (Part 11: JPEG 2000 for Wireless)
-    #[cfg(feature = "jpwl")]
-    RED,
-    /// SEC marker value (Part 8: Secure JPEG 2000)
-    #[cfg(feature = "jpspec")]
-    SEC,
-    /// INSEC marker value (Part 8: Secure JPEG 2000)
-    #[cfg(feature = "jpspec")]
-    INSEC,
 }
 
 impl From<u32> for J2KMarker {
@@ -316,18 +298,6 @@ impl From<u32> for J2KMarker {
             0xFF75 => Self::MCC,
             0xFF74 => Self::MCT,
             0xFF77 => Self::MCO,
-            #[cfg(feature = "jpwl")]
-            0xFF68 => Self::EPC,
-            #[cfg(feature = "jpwl")]
-            0xFF66 => Self::EPB,
-            #[cfg(feature = "jpwl")]
-            0xFF67 => Self::ESD,
-            #[cfg(feature = "jpwl")]
-            0xFF69 => Self::RED,
-            #[cfg(feature = "jpspec")]
-            0xFF65 => Self::SEC,
-            #[cfg(feature = "jpspec")]
-            0xFF94 => Self::INSEC,
             num => Self::UNK(num),
         }
     }
@@ -369,18 +339,6 @@ impl J2KMarker {
             Self::MCC => 0xFF75,
             Self::MCT => 0xFF74,
             Self::MCO => 0xFF77,
-            #[cfg(feature = "jpwl")]
-            Self::EPC => 0xFF68,
-            #[cfg(feature = "jpwl")]
-            Self::EPB => 0xFF66,
-            #[cfg(feature = "jpwl")]
-            Self::ESD => 0xFF67,
-            #[cfg(feature = "jpwl")]
-            Self::RED => 0xFF69,
-            #[cfg(feature = "jpspec")]
-            Self::SEC => 0xFF65,
-            #[cfg(feature = "jpspec")]
-            Self::INSEC => 0xFF94,
             Self::UNK(num) => *num,
         }
     }
@@ -420,19 +378,6 @@ impl J2KMarker {
             Self::CPF => J2KState::MH,
             Self::MCC => J2KState::MH | J2KState::TPH,
             Self::MCO => J2KState::MH | J2KState::TPH,
-            #[cfg(feature = "jpwl")]
-            Self::EPC => J2KState::MH | J2KState::TPH,
-            #[cfg(feature = "jpwl")]
-            Self::EPB => J2KState::MH | J2KState::TPH,
-            #[cfg(feature = "jpwl")]
-            Self::ESD => J2KState::MH | J2KState::TPH,
-            #[cfg(feature = "jpwl")]
-            Self::RED => J2KState::MH | J2KState::TPH,
-            #[cfg(feature = "jpspec")]
-            Self::SEC => J2K_DEC_STATE_MH,
-            #[cfg(feature = "jpspec")]
-            Self::INSEC => J2KState::NONE,
-
             _ => J2KState::MH | J2KState::TPH,
         }
     }
@@ -466,18 +411,6 @@ impl J2KMarker {
             Self::CPF => opj_j2k_read_cpf(p_j2k, p_header_data, p_header_size, p_manager),
             Self::MCC => opj_j2k_read_mcc(p_j2k, p_header_data, p_header_size, p_manager),
             Self::MCO => opj_j2k_read_mco(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpwl")]
-            Self::EPC => opj_j2k_read_epc(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpwl")]
-            Self::EPB => opj_j2k_read_epb(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpwl")]
-            Self::ESD => opj_j2k_read_esd(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpwl")]
-            Self::RED => opj_j2k_read_red(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpspec")]
-            Self::SEC => opj_j2k_read_sec(p_j2k, p_header_data, p_header_size, p_manager),
-            #[cfg(feature = "jpspec")]
-            Self::INSEC => opj_j2k_read_insec(p_j2k, p_header_data, p_header_size, p_manager),
             _ => {
                 // No handler for this marker.
                 event_msg!(&mut *p_manager, EVT_ERROR, "No handler for unknown marker.\n",);
@@ -7818,7 +7751,7 @@ pub(crate) fn opj_j2k_end_decompress(
     1i32
 }
 
-pub(crate) fn opj_j2k_read_header(
+pub(crate) unsafe fn opj_j2k_read_header(
     mut p_stream: &mut Stream,
     mut p_j2k: &mut opj_j2k,
     mut p_image: *mut *mut opj_image_t,
@@ -12170,7 +12103,7 @@ pub(crate) fn opj_j2k_set_decoded_resolution_factor(
     }
 }
 
-pub(crate) fn opj_j2k_encoder_set_extra_options(
+pub(crate) unsafe fn opj_j2k_encoder_set_extra_options(
     p_j2k: &mut opj_j2k,
     options: &[&str],
     p_manager: &mut opj_event_mgr,

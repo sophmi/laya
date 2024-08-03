@@ -94,7 +94,7 @@ impl dwt_local {
         unsafe { *self.mem.offset(i) }
     }
 
-    fn m_mut(&self, i: isize) -> &mut i32 {
+    fn m_mut(&mut self, i: isize) -> &mut i32 {
         unsafe { &mut *self.mem.offset(i) }
     }
 
@@ -106,11 +106,11 @@ impl dwt_local {
         self.m(self.d_idx(i, 1))
     }
 
-    fn s_mut(&self, i: i32) -> &mut i32 {
+    fn s_mut(&mut self, i: i32) -> &mut i32 {
         self.m_mut(self.s_idx(i, 1))
     }
 
-    fn d_mut(&self, i: i32) -> &mut i32 {
+    fn d_mut(&mut self, i: i32) -> &mut i32 {
         self.m_mut(self.d_idx(i, 1))
     }
 
@@ -131,7 +131,7 @@ impl dwt_local {
     }
 
     /// Inverse 5-3 wavelet transform in 1-D.
-    fn decode_1(&self) {
+    fn decode_1(&mut self) {
         if self.cas == 0 {
             if self.dn > 0 || self.sn > 1 {
                 for i in 0..self.sn {
@@ -158,7 +158,7 @@ impl dwt_local {
     }
 
     fn decode_partial_1(
-        &self,
+        &mut self,
         win_l_x0: OPJ_INT32,
         win_l_x1: OPJ_INT32,
         win_h_x0: OPJ_INT32,
@@ -194,7 +194,7 @@ impl dwt_local {
     }
 
     fn decode_partial_1_parallel(
-        &self,
+        &mut self,
         win_l_x0: OPJ_INT32,
         win_l_x1: OPJ_INT32,
         win_h_x0: OPJ_INT32,
@@ -453,7 +453,7 @@ unsafe fn opj_dwt_interleave_v(mut v: &opj_dwt_t, mut a: *mut OPJ_INT32, mut x: 
 // Inverse 5-3 wavelet transform in 1-D for one row.
 // </summary>
 // Performs interleave, inverse wavelet transform and copy back to buffer
-unsafe fn opj_idwt53_h(mut dwt: &opj_dwt_t, mut tiledp: *mut OPJ_INT32) {
+unsafe fn opj_idwt53_h(mut dwt: &mut opj_dwt_t, mut tiledp: *mut OPJ_INT32) {
     // For documentation purpose
     opj_dwt_interleave_h(dwt, tiledp);
     dwt.decode_1();
@@ -469,7 +469,7 @@ unsafe fn opj_idwt53_h(mut dwt: &opj_dwt_t, mut tiledp: *mut OPJ_INT32) {
 // </summary>
 // Performs interleave, inverse wavelet transform and copy back to buffer
 unsafe fn opj_idwt53_v(
-    mut dwt: &opj_dwt_t,
+    mut dwt: &mut opj_dwt_t,
     mut tiledp_col: *mut OPJ_INT32,
     mut stride: OPJ_SIZE_T,
     mut nb_cols: OPJ_INT32,
@@ -1498,20 +1498,20 @@ unsafe fn opj_dwt_decode_tile(
         h.cas = (*tr).x0 % 2i32;
         j = 0 as OPJ_UINT32;
         while j < rh {
-            opj_idwt53_h(&h, &mut *tiledp.add((j as OPJ_SIZE_T).wrapping_mul(w as usize)));
+            opj_idwt53_h(&mut h, &mut *tiledp.add((j as OPJ_SIZE_T).wrapping_mul(w as usize)));
             j += 1;
         }
         v.dn = rh.wrapping_sub(v.sn as OPJ_UINT32) as OPJ_INT32;
         v.cas = (*tr).y0 % 2i32;
         j = 0 as OPJ_UINT32;
         while j.wrapping_add((2i32 * 4i32) as core::ffi::c_uint) <= rw {
-            opj_idwt53_v(&v, &mut *tiledp.offset(j as isize), w as OPJ_SIZE_T, 2i32 * 4i32);
+            opj_idwt53_v(&mut v, &mut *tiledp.offset(j as isize), w as OPJ_SIZE_T, 2i32 * 4i32);
             j = (j as core::ffi::c_uint).wrapping_add((2i32 * 4i32) as core::ffi::c_uint)
                 as OPJ_UINT32
         }
         if j < rw {
             opj_idwt53_v(
-                &v,
+                &mut v,
                 &mut *tiledp.offset(j as isize),
                 w as OPJ_SIZE_T,
                 rw.wrapping_sub(j) as OPJ_INT32,

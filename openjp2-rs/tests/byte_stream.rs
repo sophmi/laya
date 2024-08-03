@@ -166,6 +166,8 @@ fn decode_byte_stream() {
     }
 
     if !image.is_null() {
-        opj_image_destroy(image);
+        unsafe {
+            opj_image_destroy(image);
+        }
     }
 }

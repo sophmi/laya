@@ -10,6 +10,7 @@ use super::openjpeg::*;
 use super::stream::*;
 
 pub type C2RustUnnamed_2 = core::ffi::c_uint;
+
 pub const JP2_STATE_UNKNOWN: C2RustUnnamed_2 = 2147483647;
 pub const JP2_STATE_END_CODESTREAM: C2RustUnnamed_2 = 16;
 pub const JP2_STATE_CODESTREAM: C2RustUnnamed_2 = 8;
@@ -17,7 +18,9 @@ pub const JP2_STATE_HEADER: C2RustUnnamed_2 = 4;
 pub const JP2_STATE_FILE_TYPE: C2RustUnnamed_2 = 2;
 pub const JP2_STATE_SIGNATURE: C2RustUnnamed_2 = 1;
 pub const JP2_STATE_NONE: C2RustUnnamed_2 = 0;
+
 pub type C2RustUnnamed_3 = core::ffi::c_uint;
+
 pub const JP2_IMG_STATE_UNKNOWN: C2RustUnnamed_3 = 2147483647;
 pub const JP2_IMG_STATE_NONE: C2RustUnnamed_3 = 0;
 
@@ -1243,10 +1246,10 @@ pub(crate) fn opj_jp2_setup_encoder(
         jp2.meth = 1 as OPJ_UINT32;
         if image.color_space as core::ffi::c_int == 1 {
             jp2.enumcs = 16 as OPJ_UINT32
-        // sRGB as defined by IEC 61966-2-1
+            // sRGB as defined by IEC 61966-2-1
         } else if image.color_space as core::ffi::c_int == 2 {
             jp2.enumcs = 17 as OPJ_UINT32
-        // greyscale
+            // greyscale
         } else if image.color_space as core::ffi::c_int == 3 {
             jp2.enumcs = 18 as OPJ_UINT32
             // YUV
@@ -1793,7 +1796,7 @@ fn opj_jp2_read_jp2h(jp2: &mut opj_jp2, mut buf: &[u8], p_manager: &mut opj_even
     1
 }
 
-pub(crate) fn opj_jp2_read_header(
+pub(crate) unsafe fn opj_jp2_read_header(
     p_stream: &mut Stream,
     jp2: &mut opj_jp2,
     p_image: *mut *mut opj_image_t,
@@ -1827,7 +1830,7 @@ pub(crate) fn opj_jp2_read_header(
         return 0i32;
     }
 
-    let ret = opj_j2k_read_header(p_stream, &mut jp2.j2k, p_image, p_manager);
+    let ret = unsafe { opj_j2k_read_header(p_stream, &mut jp2.j2k, p_image, p_manager) };
 
     let image = unsafe {
         if !p_image.is_null() && !(*p_image).is_null() {
@@ -2059,7 +2062,7 @@ pub(crate) fn opj_jp2_set_decoded_resolution_factor(
     opj_j2k_set_decoded_resolution_factor(&mut p_jp2.j2k, res_factor, p_manager)
 }
 
-pub(crate) fn opj_jp2_encoder_set_extra_options(
+pub(crate) unsafe fn opj_jp2_encoder_set_extra_options(
     p_jp2: &mut opj_jp2,
     options: &[&str],
     p_manager: &mut opj_event_mgr,

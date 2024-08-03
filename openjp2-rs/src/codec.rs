@@ -221,12 +221,12 @@ impl Codec {
             }
             CodecType::Decoder(dec) => {
                 return match dec {
-                    CodecFormat::J2K(dec) => {
+                    CodecFormat::J2K(dec) => unsafe {
                         opj_j2k_read_header(p_stream, dec, p_image, &mut self.m_event_mgr)
-                    }
-                    CodecFormat::JP2(dec) => {
+                    },
+                    CodecFormat::JP2(dec) => unsafe {
                         opj_jp2_read_header(p_stream, dec, p_image, &mut self.m_event_mgr)
-                    }
+                    },
                 };
             }
         }
@@ -449,12 +449,12 @@ impl Codec {
     pub fn encoder_set_extra_options(&mut self, options: &[&str]) -> bool {
         match &mut self.m_codec {
             CodecType::Encoder(enc) => match enc {
-                CodecFormat::J2K(enc) => {
+                CodecFormat::J2K(enc) => unsafe {
                     opj_j2k_encoder_set_extra_options(enc, options, &mut self.m_event_mgr)
-                }
-                CodecFormat::JP2(enc) => {
+                },
+                CodecFormat::JP2(enc) => unsafe {
                     opj_jp2_encoder_set_extra_options(enc, options, &mut self.m_event_mgr)
-                }
+                },
             },
             CodecType::Decoder(_) => false,
         }
