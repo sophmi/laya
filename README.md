@@ -1,5 +1,4 @@
 # Laya: efficient standards-based image API 💅
-____
 
 Laya is a work-in-progress server implementation of the [IIIF Image API](https://iiif.io/api/image/3.0/) (version 
 3.0) with an emphasis on safety, performance, and spec-conformance.
@@ -28,3 +27,7 @@ cargo build
 cargo clippy --workspace --all-targets --all-features -- -Dwarnings
 cargo +nightly fmt --all
 ```
+
+### Licensing
+
+Laya is dual-licensed under [Apache 2.0](LICENSE-APACHE) and [MIT](LICENSE-MIT).
