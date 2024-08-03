@@ -68,6 +68,6 @@ fn decode_sample_file_hadley_crater() {
     }
 
     if !image.is_null() {
-        opj_image_destroy(image);
+        unsafe { opj_image_destroy(image); }
     }
 }
