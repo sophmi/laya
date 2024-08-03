@@ -1,6 +1,7 @@
+use std::num::NonZero;
 use std::str::FromStr;
 
-use crate::iiif::{Format, Quality, Region, Rotation};
+use crate::iiif::{Dimension, Format, Quality, Region, Rotation, Scale, Size};
 
 const PERCENT_PREFIX: &str = "pct:";
 const REGION_SELECTOR_COUNT: usize = 4;
@@ -97,6 +98,80 @@ impl SpatialSelectorIndex {
     }
 }
 
+impl FromStr for Size {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let upscale = s.starts_with('^');
+        let s = if upscale { &s[1..] } else { s };
+
+        if s == "max" {
+            return Ok(Size { upscale, scale: Scale::Maximum });
+        } else if let Some(s) = s.strip_prefix(PERCENT_PREFIX) {
+            return parse_scale_percent(s, upscale);
+        }
+
+        let preserve_ratio = s.starts_with('!');
+        let s = if preserve_ratio { &s[1..] } else { s };
+
+        if s == "," {
+            return Err(ParseError::SizeMissingDimensions(s.into()));
+        }
+
+        let (width, height) = s
+            .split_once(',')
+            .ok_or(ParseError::SizeMissingComma(s.into()))?;
+
+        let scale = if preserve_ratio {
+            Scale::AspectPreserving {
+                width: parse_scale_px(width)?,
+                height: parse_scale_px(height)?,
+            }
+        } else {
+            let width = if width.is_empty() {
+                None
+            } else {
+                Some(parse_scale_px(width)?)
+            };
+            let height = if height.is_empty() {
+                None
+            } else {
+                Some(parse_scale_px(height)?)
+            };
+
+            Scale::Fixed { width, height }
+        };
+
+        Ok(Size { upscale, scale })
+    }
+}
+
+fn parse_scale_percent(s: &str, upscale: bool) -> Result<Size, ParseError> {
+    let scale = s
+        .parse::<f32>()
+        .map_err(|_| ParseError::SizePercentageUnparsable(s.into()))?;
+
+    // Image API 3.0, s 4: Size ... parameters in percentages ... must be positive
+    // Image API 3.0, s 4.2: n must not be greater than 100 [unless explicitly upscaling].
+    if scale > 0.0 && (scale <= 100.0 || upscale) {
+        Ok(Size { upscale, scale: Scale::Percentage(scale) })
+    } else {
+        Err(ParseError::SizeOutOfBounds(s.into()))
+    }
+}
+
+fn parse_scale_px(input: &str) -> Result<NonZero<Dimension>, ParseError> {
+    let dimension = input
+        .parse::<u32>()
+        .map_err(|_| ParseError::SizeDimensionUnparsable(input.into()))?;
+
+    if dimension >= 1 {
+        unsafe { Ok(NonZero::new_unchecked(dimension)) } // SAFETY: dimension >= 1
+    } else {
+        Err(ParseError::SizeOutOfBounds(input.into()))
+    }
+}
+
 impl FromStr for Rotation {
     type Err = ParseError;
 
@@ -160,6 +235,21 @@ pub enum ParseError {
 
     /// If a spatial selector was missing, or too many were provided.
     RegionSelectorCount(String),
+
+    /// If a size parameter omits the comma between width,height (e.g. `19201080`).
+    SizeMissingComma(String),
+
+    /// If a size parameter omits both width and height (e.g. `,` or `^,`).
+    SizeMissingDimensions(String),
+
+    /// If a size parameter contains a width/height value that cannot be parsed as an integer.
+    SizeDimensionUnparsable(String),
+
+    /// If a size parameter contains a width/height percentage that cannot be parsed as a float.
+    SizePercentageUnparsable(String),
+
+    /// If a size parameter contains a width/height value that is out of bounds.
+    SizeOutOfBounds(String),
 
     /// If the degrees to rotate by could not be parsed as a float.
     RotationAngleUnparsable(String),
@@ -275,6 +365,150 @@ mod test {
                 selector: SpatialSelectorIndex::Height,
             })
         );
+    }
+
+    #[test]
+    fn size_max() {
+        let result = "max".parse::<Size>();
+        assert_eq!(result, Ok(Size { upscale: false, scale: Scale::Maximum }));
+    }
+
+    #[test]
+    fn size_upscale() {
+        let result = "^max".parse::<Size>();
+        assert_eq!(result, Ok(Size { upscale: true, scale: Scale::Maximum }));
+
+        let result = "^3840,".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: true,
+                scale: Scale::Fixed { width: NonZero::new(3840), height: None },
+            })
+        );
+
+        let result = "^,2160".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: true,
+                scale: Scale::Fixed { width: None, height: NonZero::new(2160) },
+            })
+        );
+
+        let result = "^pct:200".parse::<Size>();
+        assert_eq!(result, Ok(Size { upscale: true, scale: Scale::Percentage(200.0) }));
+
+        let result = "^3840,2160".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: true,
+                scale: Scale::Fixed { width: NonZero::new(3840), height: NonZero::new(2160) },
+            })
+        );
+    }
+
+    #[test]
+    fn size_scale_one_dimension() {
+        let result = "960,".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: false,
+                scale: Scale::Fixed { width: NonZero::new(960), height: None },
+            })
+        );
+
+        let result = ",540".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: false,
+                scale: Scale::Fixed { width: None, height: NonZero::new(540) },
+            })
+        );
+    }
+
+    #[test]
+    fn size_scale_percent() {
+        let result = "pct:50".parse::<Size>();
+        assert_eq!(result, Ok(Size { upscale: false, scale: Scale::Percentage(50.0) }));
+    }
+
+    #[test]
+    fn size_scale_exact() {
+        let result = "960,540".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: false,
+                scale: Scale::Fixed { width: NonZero::new(960), height: NonZero::new(540) },
+            })
+        );
+    }
+
+    #[test]
+    fn size_scale_preserve_aspect() {
+        let result = "!960,720".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: false,
+                scale: Scale::AspectPreserving {
+                    width: NonZero::new(960).unwrap(),
+                    height: NonZero::new(720).unwrap(),
+                },
+            })
+        );
+
+        let result = "^!3840,1620".parse::<Size>();
+        assert_eq!(
+            result,
+            Ok(Size {
+                upscale: true,
+                scale: Scale::AspectPreserving {
+                    width: NonZero::new(3840).unwrap(),
+                    height: NonZero::new(1620).unwrap(),
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn size_missing_comma_err() {
+        let result = "secret".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeMissingComma("secret".into())));
+    }
+
+    #[test]
+    fn size_px_unparsable_err() {
+        let result = "1.1,1".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeDimensionUnparsable("1.1".into())));
+    }
+
+    #[test]
+    fn size_px_out_of_bounds_err() {
+        let result = "0,1".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeOutOfBounds("0".into())));
+
+        let result = "1,0".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeOutOfBounds("0".into())));
+    }
+
+    #[test]
+    fn size_percent_unparsable_err() {
+        let result = "pct:yes".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizePercentageUnparsable("yes".into())));
+    }
+
+    #[test]
+    fn size_percent_out_of_bounds_err() {
+        let result = "pct:0".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeOutOfBounds("0".into())));
+
+        let result = "pct:90125".parse::<Size>();
+        assert_eq!(result, Err(ParseError::SizeOutOfBounds("90125".into())));
     }
 
     #[test]
