@@ -1,6 +1,101 @@
 use std::str::FromStr;
 
-use crate::iiif::{Format, Quality, Rotation};
+use crate::iiif::{Format, Quality, Region, Rotation};
+
+const PERCENT_PREFIX: &str = "pct:";
+const REGION_SELECTOR_COUNT: usize = 4;
+
+impl FromStr for Region {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "full" => Ok(Region::Full),
+            "square" => Ok(Region::Square),
+            _ => {
+                if let Some(input) = s.strip_prefix(PERCENT_PREFIX) {
+                    let [x, y, width, height] = parse_region_selectors(input)?;
+                    Ok(Region::Percentage { x, y, width, height })
+                } else {
+                    let [x, y, width, height] = parse_region_selectors(s)?;
+                    Ok(Region::Absolute { x, y, width, height })
+                }
+            }
+        }
+    }
+}
+
+fn parse_region_selectors<T: SpatialSelector>(
+    input: &str,
+) -> Result<[T; REGION_SELECTOR_COUNT], ParseError> {
+    let mut selectors = [T::default(); REGION_SELECTOR_COUNT];
+    let mut split = input.split(",");
+
+    for (index, item) in selectors.iter_mut().enumerate() {
+        let s = split
+            .next()
+            .ok_or(ParseError::RegionSelectorCount(input.into()))?;
+
+        *item = s
+            .parse::<T>()
+            .map_err(|_| ParseError::region_unparsable(s, index))
+            .and_then(|value| T::validate(value, index))?;
+    }
+
+    match split.next() {
+        Some(_) => Err(ParseError::RegionSelectorCount(input.into())),
+        None => Ok(selectors),
+    }
+}
+
+trait SpatialSelector: Copy + Default + FromStr + ToString {
+    fn in_bounds(value: Self, index: usize) -> bool;
+
+    fn validate(value: Self, index: usize) -> Result<Self, ParseError> {
+        if Self::in_bounds(value, index) {
+            Ok(value)
+        } else {
+            Err(ParseError::RegionSelectorOutOfBounds {
+                input: value.to_string(),
+                selector: SpatialSelectorIndex::from_ordinal(index),
+            })
+        }
+    }
+}
+
+impl SpatialSelector for f32 {
+    fn in_bounds(value: Self, _: usize) -> bool {
+        // Image API 3.0, s 4.1: region parameters in percentages ... must be positive
+        value > 0.0
+    }
+}
+
+impl SpatialSelector for u32 {
+    fn in_bounds(value: Self, index: usize) -> bool {
+        // Image API 3.0, s 4.1: If the requested region’s height or width is zero, [fail].
+        index <= SpatialSelectorIndex::Y as usize || value > 0
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum SpatialSelectorIndex {
+    X = 0,
+    Y,
+    Width,
+    Height,
+}
+
+impl SpatialSelectorIndex {
+    fn from_ordinal(value: usize) -> Self {
+        match value {
+            0 => SpatialSelectorIndex::X,
+            1 => SpatialSelectorIndex::Y,
+            2 => SpatialSelectorIndex::Width,
+            3 => SpatialSelectorIndex::Height,
+            _ => panic!("Region bounds index must be [0, 3]."),
+        }
+    }
+}
 
 impl FromStr for Rotation {
     type Err = ParseError;
@@ -57,6 +152,15 @@ impl FromStr for Format {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseError {
+    /// If one of the spatial selectors (x, y, width, height) is out of bounds.
+    RegionSelectorOutOfBounds { input: String, selector: SpatialSelectorIndex },
+
+    /// If one of the spatial selectors (x, y, width, height) could not be parsed.
+    RegionSelectorUnparsable { input: String, selector: SpatialSelectorIndex },
+
+    /// If a spatial selector was missing, or too many were provided.
+    RegionSelectorCount(String),
+
     /// If the degrees to rotate by could not be parsed as a float.
     RotationAngleUnparsable(String),
 
@@ -70,9 +174,108 @@ pub enum ParseError {
     UnrecognisedFormat(String),
 }
 
+impl ParseError {
+    fn region_unparsable<S: Into<String>>(input: S, sel_index: usize) -> ParseError {
+        ParseError::RegionSelectorUnparsable {
+            input: input.into(),
+            selector: SpatialSelectorIndex::from_ordinal(sel_index),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn full_region() {
+        let result = "full".parse::<Region>();
+        assert_eq!(result, Ok(Region::Full));
+    }
+
+    #[test]
+    fn square_region() {
+        let result = "square".parse::<Region>();
+        assert_eq!(result, Ok(Region::Square));
+    }
+
+    #[test]
+    fn percent_region() {
+        let result = "pct:5,5,90,90".parse::<Region>();
+        assert_eq!(result, Ok(Region::Percentage { x: 5.0, y: 5.0, width: 90.0, height: 90.0 }));
+
+        let result = "pct:5.1,5.2,90.3,90.4".parse::<Region>();
+        assert_eq!(result, Ok(Region::Percentage { x: 5.1, y: 5.2, width: 90.3, height: 90.4 }));
+    }
+
+    #[test]
+    fn absolute_region() {
+        let result = "5,5,50,50".parse::<Region>();
+        assert_eq!(result, Ok(Region::Absolute { x: 5, y: 5, width: 50, height: 50 }));
+    }
+
+    #[test]
+    fn region_selector_count_err() {
+        let input = "5,5,1";
+        assert_eq!(input.parse::<Region>(), Err(ParseError::RegionSelectorCount(input.into())));
+
+        let input = "5,5,50,50,";
+        assert_eq!(input.parse::<Region>(), Err(ParseError::RegionSelectorCount(input.into())));
+
+        let input = "5,5,50,50,0";
+        assert_eq!(input.parse::<Region>(), Err(ParseError::RegionSelectorCount(input.into())));
+    }
+
+    #[test]
+    fn region_selector_unparsable_err() {
+        let input = "abcdefg";
+        assert_eq!(
+            input.parse::<Region>(),
+            Err(ParseError::RegionSelectorUnparsable {
+                input: input.into(),
+                selector: SpatialSelectorIndex::X,
+            })
+        );
+
+        let result = "5,5,c,5".parse::<Region>();
+        assert_eq!(
+            result,
+            Err(ParseError::RegionSelectorUnparsable {
+                input: "c".into(),
+                selector: SpatialSelectorIndex::Width,
+            })
+        );
+
+        let result = "5,5,5,".parse::<Region>();
+        assert_eq!(
+            result,
+            Err(ParseError::RegionSelectorUnparsable {
+                input: "".into(),
+                selector: SpatialSelectorIndex::Height,
+            })
+        );
+    }
+
+    #[test]
+    fn region_selector_oob_err() {
+        let result = "5,5,0,90".parse::<Region>();
+        assert_eq!(
+            result,
+            Err(ParseError::RegionSelectorOutOfBounds {
+                input: "0".into(),
+                selector: SpatialSelectorIndex::Width,
+            })
+        );
+
+        let result = "5,5,90,0".parse::<Region>();
+        assert_eq!(
+            result,
+            Err(ParseError::RegionSelectorOutOfBounds {
+                input: "0".into(),
+                selector: SpatialSelectorIndex::Height,
+            })
+        );
+    }
 
     #[test]
     fn rotation() {
