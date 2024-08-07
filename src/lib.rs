@@ -61,7 +61,7 @@ mod hyper_compat {
             mut self: Pin<&mut Self>,
             cx: &mut Context<'_>,
             mut buf: hyper::rt::ReadBufCursor<'_>,
-        ) -> Poll<std::io::Result<()>> {
+        ) -> Poll<io::Result<()>> {
             unsafe {
                 let read_slice = {
                     let buffer = buf.as_mut();
@@ -84,9 +84,9 @@ mod hyper_compat {
         data: Option<Bytes>,
     }
 
-    impl From<&'static str> for ResponseBody {
-        fn from(data: &'static str) -> Self {
-            ResponseBody { _marker: PhantomData, data: Some(Bytes::from(data)) }
+    impl ResponseBody {
+        pub fn new<I: Into<Bytes>>(body: I) -> Self {
+            ResponseBody { _marker: PhantomData, data: Some(body.into()) }
         }
     }
 
@@ -142,15 +142,7 @@ use hyper::{Method, Request, Response, StatusCode};
 use hyper_compat::ResponseBody;
 use tracing::{info, info_span};
 
-async fn hyper_demo(req: Request<Incoming>) -> Result<Response<ResponseBody>, Infallible> {
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/hello") => Ok(Response::new(ResponseBody::from("world"))),
-        _ => Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(ResponseBody::from("notfound"))
-            .unwrap()),
-    }
-}
+use crate::http::handle_request;
 
 pub fn start() {
     let startup = info_span!("startup");
@@ -167,7 +159,7 @@ pub fn start() {
             ));
 
             executor.on_all_shards(|| async move {
-                hyper_compat::serve_http2(([0, 0, 0, 0], 43594), hyper_demo, 1024)
+                hyper_compat::serve_http2(([0, 0, 0, 0], 43594), handle_request, 1024)
                     .await
                     .unwrap();
             })
