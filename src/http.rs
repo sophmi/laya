@@ -52,7 +52,10 @@ fn decode_image_request(path: &str) -> Result<ImageRequest, ImageRequestError> {
 
     let identifier = segments
         .next()
-        .ok_or(ImageRequestError::UriMissingElement("identifier"))?; // TODO URI decode
+        .ok_or(ImageRequestError::UriMissingElement("identifier"))
+        .and_then(|input| {
+            urlencoding::decode(input).map_err(|err| ImageRequestError::UriNotUtf8("identifier"))
+        })?;
 
     let region = segments
         .next()
@@ -94,6 +97,9 @@ pub enum ImageRequestError {
     /// If the URI did not contain an expected element.
     UriMissingElement(&'static str),
 
+    /// If the URI contained a text element that was not in UTF-8 (which is an RFC6570 violation).
+    UriNotUtf8(&'static str),
+
     /// If the request contained input that could not be parsed.
     ParseError(ImageRequestParseError),
 }
@@ -107,6 +113,9 @@ impl Display for ImageRequestError {
                 write!(f, "Request path missing {element}.")
             }
             ImageRequestError::ParseError(error) => Display::fmt(error, f),
+            ImageRequestError::UriNotUtf8(element) => {
+                write!(f, "Request path {element} was not in UTF-8.")
+            }
         }
     }
 }
@@ -140,7 +149,24 @@ mod test {
                 Size::new(Scale::Max),
                 Rotation::new(0.0),
                 Quality::Default,
-                Format::Jpg
+                Format::Jpg,
+            ))
+        );
+    }
+
+    #[test]
+    fn decode_encoded_image_request() {
+        // Image API 3.0, s 9: to-encode = "/" / "?" / "#" / "[" / "]" / "@" / "%"
+        let request = decode_image_request("/a%2F%3F%23%5B%5D%40%25z/full/max/0/default.jpg");
+        assert_eq!(
+            request,
+            Ok(ImageRequest::new(
+                "a/?#[]@%z",
+                Region::Full,
+                Size::new(Scale::Max),
+                Rotation::new(0.0),
+                Quality::Default,
+                Format::Jpg,
             ))
         );
     }
