@@ -95,7 +95,7 @@ impl FromStr for Size {
         let s = if upscale { &s[1..] } else { s };
 
         if s == "max" {
-            return Ok(Size { upscale, scale: Scale::Maximum });
+            return Ok(Size { upscale, scale: Scale::Max });
         } else if let Some(s) = s.strip_prefix(PERCENT_PREFIX) {
             return parse_scale_percent(s, upscale);
         }
@@ -399,82 +399,49 @@ mod test {
     #[test]
     fn size_max() {
         let result = "max".parse::<Size>();
-        assert_eq!(result, Ok(Size { upscale: false, scale: Scale::Maximum }));
+        assert_eq!(result, Ok(Size::new(Scale::Max)));
     }
 
     #[test]
     fn size_upscale() {
         let result = "^max".parse::<Size>();
-        assert_eq!(result, Ok(Size { upscale: true, scale: Scale::Maximum }));
+        assert_eq!(result, Ok(Size::upscaled(Scale::Max)));
 
         let result = "^3840,".parse::<Size>();
-        assert_eq!(
-            result,
-            Ok(Size {
-                upscale: true,
-                scale: Scale::Fixed { width: NonZero::new(3840), height: None },
-            })
-        );
+        assert_eq!(result, Ok(Size::upscaled(Scale::fixed_width(NonZero::new(3840)))));
 
         let result = "^,2160".parse::<Size>();
-        assert_eq!(
-            result,
-            Ok(Size {
-                upscale: true,
-                scale: Scale::Fixed { width: None, height: NonZero::new(2160) },
-            })
-        );
+        assert_eq!(result, Ok(Size::upscaled(Scale::fixed_height(NonZero::new(2160)))));
 
         let result = "^pct:200".parse::<Size>();
-        assert_eq!(result, Ok(Size { upscale: true, scale: Scale::Percentage(200.0) }));
+        assert_eq!(result, Ok(Size::upscaled(Scale::Percentage(200.0))));
 
         let result = "^3840,2160".parse::<Size>();
         assert_eq!(
             result,
-            Ok(Size {
-                upscale: true,
-                scale: Scale::Fixed { width: NonZero::new(3840), height: NonZero::new(2160) },
-            })
+            Ok(Size::upscaled(Scale::fixed(NonZero::new(3840), NonZero::new(2160))))
         );
     }
 
     #[test]
     fn size_scale_one_dimension() {
         let result = "960,".parse::<Size>();
-        assert_eq!(
-            result,
-            Ok(Size {
-                upscale: false,
-                scale: Scale::Fixed { width: NonZero::new(960), height: None },
-            })
-        );
+        assert_eq!(result, Ok(Size::new(Scale::fixed_width(NonZero::new(960)))));
 
         let result = ",540".parse::<Size>();
-        assert_eq!(
-            result,
-            Ok(Size {
-                upscale: false,
-                scale: Scale::Fixed { width: None, height: NonZero::new(540) },
-            })
-        );
+        assert_eq!(result, Ok(Size::new(Scale::fixed_height(NonZero::new(540)))));
     }
 
     #[test]
     fn size_scale_percent() {
         let result = "pct:50".parse::<Size>();
-        assert_eq!(result, Ok(Size { upscale: false, scale: Scale::Percentage(50.0) }));
+        assert_eq!(result, Ok(Size::new(Scale::Percentage(50.0))));
     }
 
     #[test]
     fn size_scale_exact() {
         let result = "960,540".parse::<Size>();
-        assert_eq!(
-            result,
-            Ok(Size {
-                upscale: false,
-                scale: Scale::Fixed { width: NonZero::new(960), height: NonZero::new(540) },
-            })
-        );
+        assert_eq!(result, Ok(Size::new(Scale::fixed(NonZero::new(960), NonZero::new(540)))));
     }
 
     #[test]
@@ -482,25 +449,19 @@ mod test {
         let result = "!960,720".parse::<Size>();
         assert_eq!(
             result,
-            Ok(Size {
-                upscale: false,
-                scale: Scale::AspectPreserving {
-                    width: NonZero::new(960).unwrap(),
-                    height: NonZero::new(720).unwrap(),
-                },
-            })
+            Ok(Size::new(Scale::AspectPreserving {
+                width: NonZero::new(960).unwrap(),
+                height: NonZero::new(720).unwrap(),
+            }))
         );
 
         let result = "^!3840,1620".parse::<Size>();
         assert_eq!(
             result,
-            Ok(Size {
-                upscale: true,
-                scale: Scale::AspectPreserving {
-                    width: NonZero::new(3840).unwrap(),
-                    height: NonZero::new(1620).unwrap(),
-                },
-            })
+            Ok(Size::new(Scale::AspectPreserving {
+                width: NonZero::new(3840).unwrap(),
+                height: NonZero::new(1620).unwrap(),
+            }))
         );
     }
 
@@ -543,16 +504,16 @@ mod test {
     #[test]
     fn rotation() {
         let result = "180".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180.0 }));
+        assert_eq!(result, Ok(Rotation::new(180.0)));
 
         let result = "180.42".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: false, degrees: 180.42 }));
+        assert_eq!(result, Ok(Rotation::new(180.42)));
     }
 
     #[test]
     fn mirrored_rotation() {
         let result = "!180".parse::<Rotation>();
-        assert_eq!(result, Ok(Rotation { mirror: true, degrees: 180.0 }));
+        assert_eq!(result, Ok(Rotation::mirrored(180.0)));
     }
 
     #[test]
