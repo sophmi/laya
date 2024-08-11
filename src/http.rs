@@ -1,13 +1,18 @@
 use std::convert::Infallible;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 
 use hyper::body::{Bytes, Incoming};
+use hyper::service::Service;
 use hyper::{Method, Request, Response, StatusCode};
 
 use crate::hyper_compat::ResponseBody;
-use crate::iiif::parse::{ParseError as ImageRequestParseError, ParseError};
+use crate::iiif::parse::ParseError as ImageRequestParseError;
 use crate::iiif::{Format, ImageRequest, Quality, Region, Rotation, Size};
+use crate::resolve::DiskImageSource;
 
 mod executor;
 mod server;
@@ -15,12 +20,13 @@ mod stream;
 
 const PREFIX: &str = "/"; // TODO: read this from config
 
-pub(crate) async fn handle_request(
+pub async fn handle_request(
     req: Request<Incoming>,
+    images: Arc<DiskImageSource>,
 ) -> Result<Response<ResponseBody>, Infallible> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, p) if p.ends_with("info.json") => info_request(p),
-        (&Method::GET, p) if p.starts_with(PREFIX) => image_request(p),
+        (&Method::GET, p) if p.starts_with(PREFIX) => image_request(p, images).await,
         _ => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(ResponseBody::new("notfound"))
@@ -28,22 +34,23 @@ pub(crate) async fn handle_request(
     }
 }
 
-fn image_request(path: &str) -> Result<Response<ResponseBody>, Infallible> {
-    let request = decode_image_request(path);
-
-    let response = if let Err(error) = request {
-        Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(ResponseBody::new(error.to_string()))
-            .unwrap()
-    } else {
-        Response::builder()
-            .status(StatusCode::OK)
-            .body(ResponseBody::new("OK"))
-            .unwrap()
+async fn image_request(
+    path: &str,
+    source: Arc<DiskImageSource>,
+) -> Result<Response<ResponseBody>, Infallible> {
+    let request = match decode_image_request(path) {
+        Ok(r) => r,
+        Err(e) => return Ok(bad_request(e.to_string())),
     };
 
-    Ok(response)
+    let Ok(image) = source.resolve(request.identifier()).await else {
+        return Ok(bad_request("io error")); // TODO
+    };
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .body(ResponseBody::new("OK"))
+        .unwrap())
 }
 
 fn decode_image_request(path: &str) -> Result<ImageRequest, ImageRequestError> {
@@ -131,6 +138,13 @@ pub enum InfoRequestError {}
 
 fn info_request(path: &str) -> Result<Response<ResponseBody>, Infallible> {
     unimplemented!()
+}
+
+fn bad_request<I: Into<Bytes>>(body: I) -> Response<ResponseBody> {
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(ResponseBody::new(body.into()))
+        .unwrap()
 }
 
 #[cfg(test)]

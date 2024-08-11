@@ -5,6 +5,7 @@ compile_error!("Laya requires a Linux kernel >= 5.8");
 
 mod http;
 mod iiif;
+mod resolve;
 
 // TODO: split this sample code into http.
 mod hyper_compat {
@@ -20,8 +21,9 @@ mod hyper_compat {
     use glommio::net::{TcpListener, TcpStream};
     use glommio::sync::Semaphore;
     use hyper::body::{Body as HttpBody, Bytes, Frame, Incoming};
-    use hyper::service::service_fn;
+    use hyper::service::Service;
     use hyper::{Error, Request, Response};
+    use hyper_util::server::conn::auto::Builder as ServerBuilder;
 
     #[derive(Clone)]
     struct HyperExecutor;
@@ -101,14 +103,15 @@ mod hyper_compat {
         }
     }
 
-    pub(crate) async fn serve_http2<S, F, R, A>(
+    pub(crate) async fn serve_http2<S, R, A>(
         addr: A,
         service: S,
         max_connections: usize,
     ) -> io::Result<()>
     where
-        S: Fn(Request<Incoming>) -> F + 'static + Copy,
-        F: Future<Output = Result<Response<ResponseBody>, R>> + 'static,
+        S: Service<Request<Incoming>, Response = Response<ResponseBody>, Error = R>
+            + Clone
+            + 'static,
         R: std::error::Error + 'static + Send + Sync,
         A: Into<SocketAddr>,
     {
@@ -120,12 +123,13 @@ mod hyper_compat {
                     return Err(x.into());
                 }
                 Ok(stream) => {
-                    let addr = stream.local_addr().unwrap();
+                    stream.local_addr()?;
                     let io = HyperStream(stream);
-                    glommio::spawn_local(enclose! {(conn_control) async move {
-                        let _permit = conn_control.acquire_permit(1).await;
-                        if let Err(err) = hyper_util::server::conn::auto::Builder::new(HyperExecutor).serve_connection(io, service_fn(service)).await {
 
+                    glommio::spawn_local(enclose! { (service, conn_control) async move {
+                        let _permit = conn_control.acquire_permit(1).await;
+                        if let Err(e) = ServerBuilder::new(HyperExecutor).serve_connection(io, service).await {
+                            // TODO
                         }
                     }}).detach();
                 }
@@ -134,23 +138,24 @@ mod hyper_compat {
     }
 }
 
-use std::convert::Infallible;
+use std::path::Path;
+use std::sync::Arc;
 
 use glommio::{CpuSet, LocalExecutorPoolBuilder, PoolPlacement};
-use hyper::body::Incoming;
-use hyper::{Method, Request, Response, StatusCode};
-use hyper_compat::ResponseBody;
+use hyper::service::service_fn;
 use tracing::{info, info_span};
 
 use crate::http::handle_request;
+use crate::resolve::DiskImageSource;
 
-pub fn start() {
+pub fn start(path: Box<Path>) {
     let startup = info_span!("startup");
 
-    startup
-        .in_scope(|| {
-            let num_cpus = num_cpus::get_physical();
+    let images = Arc::new(DiskImageSource::new(path));
 
+    startup
+        .in_scope(move || {
+            let num_cpus = num_cpus::get_physical();
             info!("running server on {num_cpus} CPUs");
 
             let executor = LocalExecutorPoolBuilder::new(PoolPlacement::MaxSpread(
@@ -158,10 +163,14 @@ pub fn start() {
                 CpuSet::online().ok(),
             ));
 
-            executor.on_all_shards(|| async move {
-                hyper_compat::serve_http2(([0, 0, 0, 0], 43594), handle_request, 1024)
-                    .await
-                    .unwrap();
+            executor.on_all_shards(|| async {
+                hyper_compat::serve_http2(
+                    ([0, 0, 0, 0], 43594),
+                    service_fn(move |req| handle_request(req, images.clone())),
+                    1024,
+                )
+                .await
+                .unwrap();
             })
         })
         .expect("failed to configure IO worker pool")

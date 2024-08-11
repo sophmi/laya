@@ -8,6 +8,7 @@ license = "Apache-2.0 OR MIT"
 members = ["openjp2-rs"]
 
 [dependencies]
+clap = { version = "4.5.13", features = ["derive"] }
 futures-lite = "1.13" # glommio requires 1.13.0
 glommio = "0.9.0"
 hyper = { version = "1.4.1", features = ["server", "http2", "http1"] }
