@@ -458,7 +458,7 @@ mod test {
         let result = "^!3840,1620".parse::<Size>();
         assert_eq!(
             result,
-            Ok(Size::new(Scale::AspectPreserving {
+            Ok(Size::upscaled(Scale::AspectPreserving {
                 width: NonZero::new(3840).unwrap(),
                 height: NonZero::new(1620).unwrap(),
             }))
